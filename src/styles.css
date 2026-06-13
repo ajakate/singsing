@@ -1,0 +1,59 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+  font-family: system-ui, sans-serif;
+  background: #111317;
+  color: #e8eaed;
+  margin: 0;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+}
+main { width: 100%; max-width: 720px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 0.5rem; }
+.muted { color: #9aa0a6; font-size: 0.85rem; }
+.small { font-size: 0.78rem; }
+
+.countin { display: flex; gap: 0.6rem; margin: 0.5rem 0; }
+.countin .dot {
+  width: 2.2rem; height: 2.2rem; border-radius: 50%;
+  background: #1e2127; border: 2px solid #2a2e37;
+  display: flex; align-items: center; justify-content: center;
+  color: #6b7280; font-size: 0.9rem; transition: all 0.08s;
+}
+.countin .dot.lit { background: #b88523; border-color: #ffd84d; color: #fff; }
+
+canvas {
+  width: 100%; height: 280px; background: #16181d;
+  border-radius: 0.75rem; margin: 0.25rem 0 1rem; display: block;
+}
+
+.controls { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+button {
+  background: #2563eb; color: white; border: 0; padding: 0.6rem 1rem;
+  border-radius: 0.5rem; font-size: 0.95rem; cursor: pointer;
+}
+button.secondary { background: #2a2e37; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.score { font-size: 1.05rem; margin-top: 0.5rem; min-height: 1.4rem; }
+.tag { font-variant-numeric: tabular-nums; }
+.tag.hit { color: #5fd99a; }
+.tag.wrong { color: #ef6a5d; }
+.tag.missed { color: #9aa0a6; }
+
+/* settings */
+.settings { display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem; }
+.field { background: #1a1d23; padding: 1rem; border-radius: 0.75rem; }
+.field label { display: block; font-size: 0.85rem; color: #9aa0a6; margin-bottom: 0.5rem; }
+.field input[type="range"] { width: 100%; }
+.val { color: #e8eaed; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.degree-toggles { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.toggle {
+  width: 2.6rem; height: 2.6rem; border-radius: 0.6rem;
+  background: #1e2127; color: #6b7280; border: 2px solid #2a2e37; font-size: 1rem;
+}
+.toggle.on { background: #2d4a8a; border-color: #5b8def; color: #fff; }
