@@ -2,10 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-// base: "./" keeps asset paths relative so the build works on GitHub Pages
-// (project subpath) without extra config. Swap to "/<repo>/" if you prefer.
-export default defineConfig({
-  base: "./",
+// Served from https://ajakate.github.io/singsing/ on GitHub Pages, so the
+// production build needs base "/singsing/"; local dev stays at "/".
+export default defineConfig(({ command }) => ({
+  base: command === "build" ? "/singsing/" : "/",
   plugins: [
     react(),
     VitePWA({
@@ -22,4 +22,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+}));
