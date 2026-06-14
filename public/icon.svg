@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- full-bleed background so the icon is maskable-safe -->
+  <rect width="512" height="512" fill="#111317"/>
+  <!-- ascending note bars, like the practice piano-roll -->
+  <rect x="116" y="300" width="68" height="44" rx="22" fill="#3b5bdb"/>
+  <rect x="222" y="232" width="68" height="44" rx="22" fill="#5b8def"/>
+  <rect x="328" y="164" width="68" height="44" rx="22" fill="#7ea6ff"/>
+  <!-- gold sung-pitch contour through the bar centers -->
+  <path d="M150 322 L256 254 L362 186" fill="none" stroke="#ffd84d"
+        stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="362" cy="186" r="17" fill="#ffd84d"/>
+</svg>

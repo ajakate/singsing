@@ -10,6 +10,7 @@ export default defineConfig(({ command }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      includeAssets: ["icon.svg"],
       manifest: {
         name: "singsing — sight-singing practice",
         short_name: "singsing",
@@ -17,8 +18,10 @@ export default defineConfig(({ command }) => ({
         theme_color: "#111317",
         background_color: "#111317",
         display: "standalone",
-        // TODO: add icons (192px, 512px) for a polished install experience.
-        icons: [],
+        icons: [
+          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+        ],
       },
     }),
   ],
