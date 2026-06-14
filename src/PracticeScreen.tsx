@@ -15,6 +15,7 @@ export function PracticeScreen({ settings }: { settings: Settings }) {
   const [lit, setLit] = useState(0);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
+  const [keyName, setKeyName] = useState("C major");
 
   // create the controller once
   useEffect(() => {
@@ -22,20 +23,21 @@ export function PracticeScreen({ settings }: { settings: Settings }) {
       onLit: setLit,
       onRunning: setRunning,
       onResult: setResult,
+      onKey: setKeyName,
     });
     ctrlRef.current = ctrl;
     return () => ctrl.dispose();
   }, []);
 
-  // regenerate the exercise when the pool or length changes
+  // regenerate the exercise when the degree pool, length, or key set changes
   useEffect(() => {
     ctrlRef.current?.regenerate();
-  }, [settings.melodyLength, settings.degreePool.join(",")]);
+  }, [settings.melodyLength, settings.degreePool.join(","), settings.keyPool.join(",")]);
 
   return (
     <>
       <p className="muted">
-        Key: C major · sing in any octave · green = hit, red = wrong, gray = missed
+        Key: <strong>{keyName}</strong> · sing in any octave · green = hit, red = wrong, gray = missed
       </p>
 
       <div className="countin">

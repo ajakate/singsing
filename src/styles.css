@@ -57,3 +57,6 @@ button:disabled { opacity: 0.5; cursor: default; }
   background: #1e2127; color: #6b7280; border: 2px solid #2a2e37; font-size: 1rem;
 }
 .toggle.on { background: #2d4a8a; border-color: #5b8def; color: #fff; }
+.toggle.wide { width: auto; height: auto; padding: 0.5rem 0.9rem; font-size: 0.9rem; }
+.row { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.row button { padding: 0.4rem 0.8rem; font-size: 0.85rem; }

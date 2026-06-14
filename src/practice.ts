@@ -1,6 +1,7 @@
 import {
   type DegreeNote,
   type Key,
+  NOTE_NAMES,
   centsToPitchClass,
   degreeLabel,
   degreeToPitchClass,
@@ -8,16 +9,16 @@ import {
   hzToMidiFloat,
   semitoneOffset,
 } from "./theory";
-import { PitchEngine, scheduleClick, scheduleTone } from "./audio";
+import { PitchEngine, scheduleClick, scheduleDrone, scheduleTone } from "./audio";
 import type { Settings } from "./settings";
 
-const KEY: Key = { tonicPc: 0, mode: "major" }; // C major (fixed for now)
-const TONIC_MIDI = 60; // C4, reference octave
+const MODE = "major" as const;
 const LABEL = "numbers" as const;
 const COUNT_IN = 4; // beats before the first note
 const NOTE_BEATS = 1; // quarter notes
 const SEMI_RANGE = 12; // vertical span of the roll, in semitones above tonic
 const HZ_WINDOW = 5; // median smoothing window for the pitch guide
+const CHORD_DUR = 0.55; // seconds per cadence chord
 
 export type Verdict = "pending" | "hit" | "wrong" | "missed";
 
@@ -36,6 +37,7 @@ export interface PracticeCallbacks {
   onLit: (lit: number) => void; // count-in dots lit (0..COUNT_IN)
   onRunning: (running: boolean) => void;
   onResult: (result: RunResult | null) => void;
+  onKey: (name: string) => void; // e.g. "D major"
 }
 
 const PAD = { l: 34, r: 12, t: 14, b: 14 };
@@ -47,11 +49,22 @@ const COLORS: Record<Verdict, string> = {
   missed: "#555b66",
 };
 
+// I–IV–V–I voiced as semitone offsets above the tonic.
+const CADENCE: number[][] = [
+  [0, 4, 7, 12], // I
+  [5, 9, 12], // IV
+  [7, 11, 14], // V
+  [0, 4, 7, 12], // I
+];
+
 export class PracticeController {
   private ctx2d: CanvasRenderingContext2D;
   private engine = new PitchEngine();
   private audioCtx?: AudioContext;
 
+  private master?: GainNode; // all scheduled audio routes through this so stop() can cut it
+  private key: Key = { tonicPc: 0, mode: MODE };
+  private tonicMidi = 60; // C4; recomputed per key, kept in a singable octave
   private melody: DegreeNote[] = [];
   private verdicts: Verdict[] = [];
   private sungDeg: (number | null)[] = [];
@@ -81,15 +94,38 @@ export class PracticeController {
 
   dispose() {
     window.removeEventListener("resize", this.onResize);
+    this.stopAllAudio();
     this.engine.stop();
     this.audioCtx?.close();
   }
 
+  // Output node for all scheduled audio; cutting it stops everything at once.
+  private out(): GainNode {
+    const c = this.ctx();
+    if (!this.master) {
+      this.master = c.createGain();
+      this.master.connect(c.destination);
+    }
+    return this.master;
+  }
+
+  // Immediately silence any scheduled clicks / cadence / drone. Already-scheduled
+  // oscillators keep running but are disconnected from output, so they're silent.
+  private stopAllAudio() {
+    if (this.master) {
+      try {
+        this.master.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+      this.master = undefined;
+    }
+  }
+
   // --- settings accessors ---
-  private get bpm() { return this.getSettings().bpm; }
   private get tol() { return this.getSettings().toleranceCents; }
   private get holdFrames() { return this.getSettings().holdFrames; }
-  private get beatDur() { return 60 / this.bpm; }
+  private get beatDur() { return 60 / this.getSettings().bpm; }
 
   private ctx(): AudioContext {
     if (!this.audioCtx) this.audioCtx = new AudioContext();
@@ -102,11 +138,22 @@ export class PracticeController {
 
   // --- public actions ---
   regenerate() {
+    this.pickKey();
     const { melodyLength, degreePool } = this.getSettings();
     this.melody = generateMelody(melodyLength, [...degreePool].sort((a, b) => a - b));
     this.resetRun();
     this.cb.onResult(null);
     this.draw(-1);
+  }
+
+  private pickKey() {
+    const pool = this.getSettings().keyPool;
+    const choices = pool.length ? pool : [0]; // empty selection falls back to C
+    const pc = choices[Math.floor(Math.random() * choices.length)];
+    this.key = { tonicPc: pc, mode: MODE };
+    // keep the tonic within ~a tritone of C4 so cadences stay singable
+    this.tonicMidi = 60 + (pc <= 6 ? pc : pc - 12);
+    this.cb.onKey(`${NOTE_NAMES[pc]} ${MODE}`);
   }
 
   private resetRun() {
@@ -125,12 +172,28 @@ export class PracticeController {
 
     this.resetRun();
     this.cb.onResult(null);
-    this.startTime = c.currentTime + 0.15;
+
+    const { playCadence, playDrone } = this.getSettings();
+    const outNode = this.out();
+    const lead = c.currentTime + 0.15;
+
+    // Optional cadence first; the count-in starts after it.
+    let preroll = 0;
+    if (playCadence) {
+      CADENCE.forEach((chord, i) => this.scheduleChord(c, chord, lead + i * CHORD_DUR, CHORD_DUR * 0.95));
+      preroll = CADENCE.length * CHORD_DUR + 0.2;
+    }
+    this.startTime = lead + preroll;
+
     const totalBeats = COUNT_IN + this.melody.length * NOTE_BEATS;
     for (let b = 0; b < totalBeats; b++) {
-      scheduleClick(c, this.startTime + b * this.beatDur, b % COUNT_IN === 0);
+      scheduleClick(c, this.startTime + b * this.beatDur, b % COUNT_IN === 0, outNode);
     }
-    scheduleTone(c, TONIC_MIDI, this.startTime, this.beatDur * COUNT_IN * 0.9);
+    if (playDrone) {
+      // Soft tonic an octave below the sung range, sustained through the whole
+      // exercise (count-in + all notes) as a steady reference.
+      scheduleDrone(c, [this.tonicMidi - 12], this.startTime, this.beatDur * totalBeats, 0.1, outNode);
+    }
 
     this.running = true;
     this.cb.onRunning(true);
@@ -143,11 +206,16 @@ export class PracticeController {
   preview() {
     const c = this.ctx();
     c.resume();
+    const out = this.out();
     const t0 = c.currentTime + 0.1;
-    scheduleTone(c, TONIC_MIDI, t0, 0.4);
+    scheduleTone(c, this.tonicMidi, t0, 0.4, out);
     this.melody.forEach((n, i) => {
-      scheduleTone(c, TONIC_MIDI + semitoneOffset(n, KEY.mode), t0 + 0.5 + i * this.beatDur, this.beatDur * 0.9);
+      scheduleTone(c, this.tonicMidi + semitoneOffset(n, MODE), t0 + 0.5 + i * this.beatDur, this.beatDur * 0.9, out);
     });
+  }
+
+  private scheduleChord(c: AudioContext, semis: number[], at: number, dur: number) {
+    for (const s of semis) scheduleTone(c, this.tonicMidi + s, at, dur, this.out());
   }
 
   // --- per-frame scoring ---
@@ -168,7 +236,7 @@ export class PracticeController {
 
     if (active && hz != null) {
       const target = this.melody[noteIdx];
-      const cents = centsToPitchClass(hz, degreeToPitchClass(target, KEY));
+      const cents = centsToPitchClass(hz, degreeToPitchClass(target, this.key));
       this.acc.frames++;
       const d = this.nearestDegree(hz);
       this.acc.degCount[d] = (this.acc.degCount[d] ?? 0) + 1;
@@ -177,7 +245,7 @@ export class PracticeController {
         this.acc.maxConsec = Math.max(this.acc.maxConsec, this.acc.consec);
       } else this.acc.consec = 0;
 
-      const semis = this.displaySemis(hz, semitoneOffset(target, KEY.mode));
+      const semis = this.displaySemis(hz, semitoneOffset(target, MODE));
       this.latestSemis = semis;
       this.trace.push({ beat: curBeat - COUNT_IN, semis });
     } else if (active) {
@@ -204,6 +272,7 @@ export class PracticeController {
     this.finalizeNote(this.acc);
     this.running = false;
     this.hzBuf = [];
+    this.stopAllAudio(); // kill any in-flight clicks / cadence / drone
     this.cb.onRunning(false);
     this.draw(COUNT_IN + this.melody.length);
     this.cb.onResult({
@@ -230,7 +299,7 @@ export class PracticeController {
   }
 
   private displaySemis(hz: number, refSemis: number): number {
-    const raw = ((hzToMidiFloat(hz) - KEY.tonicPc) % 12 + 12) % 12;
+    const raw = ((hzToMidiFloat(hz) - this.key.tonicPc) % 12 + 12) % 12;
     let best = raw;
     for (const cand of [raw - 12, raw, raw + 12]) {
       if (Math.abs(cand - refSemis) < Math.abs(best - refSemis)) best = cand;
@@ -242,7 +311,7 @@ export class PracticeController {
     let best = 1;
     let bestErr = Infinity;
     for (let d = 1; d <= 7; d++) {
-      const c = Math.abs(centsToPitchClass(hz, degreeToPitchClass({ degree: d, octave: 0 }, KEY)));
+      const c = Math.abs(centsToPitchClass(hz, degreeToPitchClass({ degree: d, octave: 0 }, this.key)));
       if (c < bestErr) {
         bestErr = c;
         best = d;
@@ -310,7 +379,7 @@ export class PracticeController {
     this.melody.forEach((n, i) => {
       const x0 = xBeat(i * NOTE_BEATS) + 2;
       const x1 = xBeat((i + 1) * NOTE_BEATS) - 2;
-      const y = ySemi(semitoneOffset(n, KEY.mode));
+      const y = ySemi(semitoneOffset(n, MODE));
       g.fillStyle = COLORS[this.verdicts[i]];
       g.beginPath();
       g.roundRect(x0, y - barH / 2, x1 - x0, barH, 5);

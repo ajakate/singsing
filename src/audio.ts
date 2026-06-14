@@ -71,20 +71,62 @@ export class PitchEngine {
 }
 
 /** Schedule a metronome click at AudioContext time `at`. */
-export function scheduleClick(ctx: AudioContext, at: number, accent = false): void {
+export function scheduleClick(
+  ctx: AudioContext,
+  at: number,
+  accent = false,
+  out: AudioNode = ctx.destination,
+): void {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.frequency.value = accent ? 1500 : 900;
   gain.gain.setValueAtTime(0.0001, at);
   gain.gain.exponentialRampToValueAtTime(accent ? 0.4 : 0.2, at + 0.005);
   gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.06);
-  osc.connect(gain).connect(ctx.destination);
+  osc.connect(gain).connect(out);
   osc.start(at);
   osc.stop(at + 0.08);
 }
 
+/**
+ * Schedule a sustained drone (steady level, not the decaying envelope of
+ * scheduleTone) for one or more midi notes — used to hold the tonic under an
+ * exercise. Kept quiet by default to limit speaker bleed into the mic.
+ */
+export function scheduleDrone(
+  ctx: AudioContext,
+  midis: number[],
+  at: number,
+  dur: number,
+  level = 0.1,
+  out: AudioNode = ctx.destination,
+): void {
+  const attack = 0.1;
+  const release = 0.3;
+  const sustainUntil = Math.max(at + attack, at + dur - release);
+  for (const midi of midis) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = midiToHz(midi);
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(level, at + attack);
+    gain.gain.setValueAtTime(level, sustainUntil);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain).connect(out);
+    osc.start(at);
+    osc.stop(at + dur + 0.05);
+  }
+}
+
 /** Schedule a pitched tone (reference / melody preview) at time `at`. */
-export function scheduleTone(ctx: AudioContext, midi: number, at: number, dur = 0.5): void {
+export function scheduleTone(
+  ctx: AudioContext,
+  midi: number,
+  at: number,
+  dur = 0.5,
+  out: AudioNode = ctx.destination,
+): void {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = "triangle";
@@ -92,7 +134,7 @@ export function scheduleTone(ctx: AudioContext, midi: number, at: number, dur = 
   gain.gain.setValueAtTime(0.0001, at);
   gain.gain.exponentialRampToValueAtTime(0.3, at + 0.02);
   gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-  osc.connect(gain).connect(ctx.destination);
+  osc.connect(gain).connect(out);
   osc.start(at);
   osc.stop(at + dur + 0.05);
 }

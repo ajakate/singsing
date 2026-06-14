@@ -1,5 +1,5 @@
 import { type Settings, DEFAULT_SETTINGS } from "./settings";
-import { degreeLabel } from "./theory";
+import { degreeLabel, NOTE_NAMES } from "./theory";
 
 interface Props {
   settings: Settings;
@@ -17,6 +17,14 @@ export function SettingsScreen({ settings, onChange }: Props) {
       : [...settings.degreePool, d].sort((a, b) => a - b);
     if (next.length === 0) return; // keep at least one degree
     set("degreePool", next);
+  };
+
+  const toggleKey = (pc: number) => {
+    const has = settings.keyPool.includes(pc);
+    const next = has
+      ? settings.keyPool.filter((x) => x !== pc)
+      : [...settings.keyPool, pc].sort((a, b) => a - b);
+    set("keyPool", next); // may be emptied via Clear; falls back to C when used
   };
 
   return (
@@ -72,6 +80,50 @@ export function SettingsScreen({ settings, onChange }: Props) {
           ))}
         </div>
         <p className="muted small">Melodies are built from the highlighted degrees.</p>
+      </div>
+
+      <div className="field">
+        <label>Keys</label>
+        <div className="degree-toggles">
+          {NOTE_NAMES.map((name, pc) => (
+            <button
+              key={pc}
+              className={`toggle${settings.keyPool.includes(pc) ? " on" : ""}`}
+              onClick={() => toggleKey(pc)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <div className="row">
+          <button className="secondary" onClick={() => set("keyPool", NOTE_NAMES.map((_, i) => i))}>
+            Select all
+          </button>
+          <button className="secondary" onClick={() => set("keyPool", [])}>
+            Clear
+          </button>
+        </div>
+        <p className="muted small">
+          Each exercise picks a random key from the selected set — narrow it to your vocal range.
+        </p>
+      </div>
+
+      <div className="field">
+        <label>Key reference</label>
+        <div className="degree-toggles">
+          <button
+            className={`toggle wide${settings.playCadence ? " on" : ""}`}
+            onClick={() => set("playCadence", !settings.playCadence)}
+          >
+            Cadence (I–IV–V–I)
+          </button>
+          <button
+            className={`toggle wide${settings.playDrone ? " on" : ""}`}
+            onClick={() => set("playDrone", !settings.playDrone)}
+          >
+            Tonic drone (headphones needed)
+          </button>
+        </div>
       </div>
 
       <button className="secondary" onClick={() => onChange({ ...DEFAULT_SETTINGS })}>
