@@ -182,6 +182,7 @@ export class PracticeController {
     );
     this.resetRun();
     this.cb.onResult(null);
+    this.fitCanvas(); // range may have changed the canvas height
     this.draw(-1);
   }
 
@@ -367,6 +368,12 @@ export class PracticeController {
 
   // --- rendering ---
   private fitCanvas() {
+    // grow the canvas with the pitch range so rows keep a comfortable spacing
+    const { rangeLowIdx, rangeHighIdx } = this.getSettings();
+    const span = RANGE_LADDER[rangeHighIdx].semi - RANGE_LADDER[rangeLowIdx].semi || 12;
+    const h = Math.max(260, Math.min(560, Math.round(PAD.t + PAD.b + span * 21)));
+    this.canvas.style.height = `${h}px`;
+
     const dpr = window.devicePixelRatio || 1;
     this.canvas.width = this.canvas.clientWidth * dpr;
     this.canvas.height = this.canvas.clientHeight * dpr;

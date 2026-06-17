@@ -73,7 +73,7 @@ button.hold { user-select: none; -webkit-user-select: none; -webkit-touch-callou
   .controls button { flex: 1 1 45%; min-height: 48px; }
   .controls button.primary { flex-basis: 100%; }
 
-  canvas { height: 240px; }
+  /* canvas height is set dynamically from the pitch range (see fitCanvas) */
   .field { padding: 0.85rem; }
 }
 
