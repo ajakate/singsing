@@ -29,10 +29,16 @@ export function PracticeScreen({ settings }: { settings: Settings }) {
     return () => ctrl.dispose();
   }, []);
 
-  // regenerate the exercise when the degree pool, length, or key set changes
+  // regenerate the exercise when the degree pool, length, range, or key set changes
   useEffect(() => {
     ctrlRef.current?.regenerate();
-  }, [settings.melodyLength, settings.degreePool.join(","), settings.keyPool.join(",")]);
+  }, [
+    settings.melodyLength,
+    settings.degreePool.join(","),
+    settings.keyPool.join(","),
+    settings.rangeLowIdx,
+    settings.rangeHighIdx,
+  ]);
 
   return (
     <>

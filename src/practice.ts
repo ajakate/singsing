@@ -2,6 +2,7 @@ import {
   type DegreeNote,
   type Key,
   NOTE_NAMES,
+  RANGE_LADDER,
   centsToPitchClass,
   degreeLabel,
   degreeToPitchClass,
@@ -23,7 +24,6 @@ const MODE = "major" as const;
 const LABEL = "numbers" as const;
 const COUNT_IN = 4; // beats before the first note
 const NOTE_BEATS = 1; // quarter notes
-const SEMI_RANGE = 12; // vertical span of the roll, in semitones above tonic
 const HZ_WINDOW = 5; // median smoothing window for the pitch guide
 
 export type Verdict = "pending" | "hit" | "wrong" | "missed";
@@ -47,7 +47,6 @@ export interface PracticeCallbacks {
 }
 
 const PAD = { l: 34, r: 12, t: 14, b: 14 };
-const DEGREE_SEMIS = [0, 2, 4, 5, 7, 9, 11, 12]; // major-scale rows + octave
 const COLORS: Record<Verdict, string> = {
   pending: "#3b5bdb",
   hit: "#2f9e57",
@@ -174,8 +173,13 @@ export class PracticeController {
   // --- public actions ---
   regenerate() {
     this.pickKey();
-    const { melodyLength, degreePool } = this.getSettings();
-    this.melody = generateMelody(melodyLength, [...degreePool].sort((a, b) => a - b));
+    const { melodyLength, degreePool, rangeLowIdx, rangeHighIdx } = this.getSettings();
+    this.melody = generateMelody(
+      melodyLength,
+      [...degreePool].sort((a, b) => a - b),
+      RANGE_LADDER[rangeLowIdx].semi,
+      RANGE_LADDER[rangeHighIdx].semi,
+    );
     this.resetRun();
     this.cb.onResult(null);
     this.draw(-1);
@@ -392,20 +396,28 @@ export class PracticeController {
     const noteBeats = this.melody.length * NOTE_BEATS;
     const playBeat = curBeat - COUNT_IN;
     const xBeat = (b: number) => PAD.l + (b / noteBeats) * plotW;
-    const ySemi = (s: number) => PAD.t + (1 - s / SEMI_RANGE) * plotH;
+
+    // vertical range spans the configured low..high pitch bounds
+    const { rangeLowIdx, rangeHighIdx } = this.getSettings();
+    const semiMin = RANGE_LADDER[rangeLowIdx].semi;
+    const semiMax = RANGE_LADDER[rangeHighIdx].semi;
+    const span = semiMax - semiMin || 12;
+    const ySemi = (s: number) => PAD.t + (1 - (s - semiMin) / span) * plotH;
 
     g.clearRect(0, 0, W, H);
 
+    // scale-degree gridlines for every ladder position within the range
     g.font = "11px system-ui";
-    for (let i = 0; i < DEGREE_SEMIS.length; i++) {
-      const y = ySemi(DEGREE_SEMIS[i]);
+    for (const pos of RANGE_LADDER) {
+      if (pos.semi < semiMin || pos.semi > semiMax) continue;
+      const y = ySemi(pos.semi);
       g.strokeStyle = "#23272f";
       g.beginPath();
       g.moveTo(PAD.l, y);
       g.lineTo(W - PAD.r, y);
       g.stroke();
       g.fillStyle = "#6b7280";
-      g.fillText(degreeLabel(i === 7 ? 1 : i + 1, LABEL), 8, y + 4);
+      g.fillText(degreeLabel(pos.degree, LABEL), 8, y + 4);
     }
 
     for (let b = 0; b <= noteBeats; b++) {

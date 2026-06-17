@@ -1,5 +1,12 @@
 import { type Settings, DEFAULT_SETTINGS } from "./settings";
-import { degreeLabel, NOTE_NAMES } from "./theory";
+import { degreeLabel, NOTE_NAMES, RANGE_LADDER } from "./theory";
+
+// Label a range-ladder index: arrow marks the octave (↓ low, ↑ high).
+function rangeLabel(idx: number): string {
+  const p = RANGE_LADDER[idx];
+  const arrow = p.octave < 0 ? "↓" : p.octave > 0 ? "↑" : "";
+  return arrow + degreeLabel(p.degree, "numbers");
+}
 
 interface Props {
   settings: Settings;
@@ -64,6 +71,26 @@ export function SettingsScreen({ settings, onChange }: Props) {
         step={1}
         value={settings.melodyLength}
         onChange={(v) => set("melodyLength", v)}
+      />
+      <Slider
+        label="Range low"
+        unit=""
+        min={0}
+        max={7}
+        step={1}
+        value={settings.rangeLowIdx}
+        onChange={(v) => set("rangeLowIdx", v)}
+        format={rangeLabel}
+      />
+      <Slider
+        label="Range high"
+        unit=""
+        min={7}
+        max={14}
+        step={1}
+        value={settings.rangeHighIdx}
+        onChange={(v) => set("rangeHighIdx", v)}
+        format={rangeLabel}
       />
 
       <div className="field">
@@ -136,12 +163,13 @@ interface SliderProps {
   step: number;
   value: number;
   onChange: (v: number) => void;
+  format?: (v: number) => string; // custom display for the value
 }
-function Slider({ label, unit, min, max, step, value, onChange }: SliderProps) {
+function Slider({ label, unit, min, max, step, value, onChange, format }: SliderProps) {
   return (
     <div className="field">
       <label>
-        {label} <span className="val">{value}</span> {unit}
+        {label} <span className="val">{format ? format(value) : value}</span> {unit}
       </label>
       <input
         type="range"

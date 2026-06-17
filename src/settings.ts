@@ -7,6 +7,11 @@ export interface Settings {
   holdFrames: number; // frames the target must be held to score a hit
   degreePool: number[]; // which scale degrees (1..7) melodies may use
   melodyLength: number; // notes per exercise
+  // pitch range as indices into RANGE_LADDER (0 = low root, 7 = root, 14 = high
+  // root). Scoring stays octave-agnostic; this only affects which actual pitches
+  // get generated/previewed/shown.
+  rangeLowIdx: number; // 0..7
+  rangeHighIdx: number; // 7..14
   keyPool: number[]; // tonic pitch classes (0..11) to pick from each exercise
   playDrone: boolean; // sustain a tonic drone through the exercise
 }
@@ -17,11 +22,16 @@ export const DEFAULT_SETTINGS: Settings = {
   holdFrames: 12,
   degreePool: [1, 2, 3, 4, 5],
   melodyLength: 4,
+  rangeLowIdx: 7, // root
+  rangeHighIdx: 14, // high root
   keyPool: [0], // C only by default
   playDrone: false,
 };
 
 const STORAGE_KEY = "singsing.settings";
+
+const clamp = (v: number, lo: number, hi: number) =>
+  typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : lo;
 
 export function loadSettings(): Settings {
   try {
@@ -37,6 +47,8 @@ export function loadSettings(): Settings {
     if (!Array.isArray(merged.keyPool)) {
       merged.keyPool = [...DEFAULT_SETTINGS.keyPool];
     }
+    merged.rangeLowIdx = clamp(merged.rangeLowIdx, 0, 7);
+    merged.rangeHighIdx = clamp(merged.rangeHighIdx, 7, 14);
     return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };

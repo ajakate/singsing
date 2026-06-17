@@ -74,17 +74,54 @@ export function foldedSemitones(hz: number, tonicPc: number): number {
 }
 
 /**
- * Random melody for practice: `length` notes drawn from `pool` (scale degrees),
- * each within ±2 scale steps of the previous so leaps stay singable. v0 keeps
- * everything in the tonic octave.
+ * Scale positions from the low root (tonic an octave down) to the high root
+ * (tonic an octave up), used to bound the pitch range of generated notes by
+ * scale step. Index 7 is the root (degree 1, octave 0).
  */
-export function generateMelody(length = 4, pool = [1, 2, 3, 4, 5]): DegreeNote[] {
-  const pick = (arr: number[]) => arr[Math.floor(Math.random() * arr.length)];
-  const out: DegreeNote[] = [{ degree: pick(pool), octave: 0 }];
+export const RANGE_LADDER: { degree: number; octave: number; semi: number }[] = (() => {
+  const ladder: { degree: number; octave: number; semi: number }[] = [];
+  for (const octave of [-1, 0]) {
+    for (let degree = 1; degree <= 7; degree++) {
+      ladder.push({ degree, octave, semi: semitoneOffset({ degree, octave }, "major") });
+    }
+  }
+  ladder.push({ degree: 1, octave: 1, semi: 12 }); // high root
+  return ladder;
+})();
+
+/**
+ * Random melody for practice: `length` notes drawn from `pool` (scale degrees),
+ * spanning pitches between `lowSemi` and `highSemi` (semitones from the tonic).
+ * Notes are picked by walking the pitch-sorted candidate set within ±2 positions
+ * so motion stays stepwise even across octaves.
+ */
+export function generateMelody(
+  length = 4,
+  pool = [1, 2, 3, 4, 5],
+  lowSemi = 0,
+  highSemi = 12,
+): DegreeNote[] {
+  const candidates: DegreeNote[] = [];
+  for (let octave = -1; octave <= 1; octave++) {
+    for (const degree of pool) {
+      const semi = semitoneOffset({ degree, octave }, "major");
+      if (semi >= lowSemi && semi <= highSemi) candidates.push({ degree, octave });
+    }
+  }
+  // fall back to the tonic-octave pool if the range/pool combination is empty
+  if (candidates.length === 0) for (const degree of pool) candidates.push({ degree, octave: 0 });
+  candidates.sort((a, b) => semitoneOffset(a, "major") - semitoneOffset(b, "major"));
+
+  const pick = <T>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  let idx = Math.floor(Math.random() * candidates.length);
+  const out: DegreeNote[] = [{ ...candidates[idx] }];
   for (let i = 1; i < length; i++) {
-    const prev = out[i - 1].degree;
-    const cands = pool.filter((d) => Math.abs(d - prev) <= 2);
-    out.push({ degree: pick(cands.length ? cands : pool), octave: 0 });
+    const near: number[] = [];
+    for (let j = Math.max(0, idx - 2); j <= Math.min(candidates.length - 1, idx + 2); j++) {
+      if (j !== idx) near.push(j);
+    }
+    idx = near.length ? pick(near) : idx;
+    out.push({ ...candidates[idx] });
   }
   return out;
 }
