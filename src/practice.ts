@@ -117,12 +117,15 @@ export class PracticeController {
     // controller remounts for the lifetime of the page.
   }
 
-  // Press-and-hold reference drone: tonic (+ octave below) until released.
+  // Press-and-hold reference drone: tonic across three octaves until released.
+  // The octave *up* carries on phone speakers (which roll off the low end),
+  // while the lower octaves add body on headphones/good speakers.
   startHeldDrone() {
     if (this.running || this.heldDrone) return;
     const c = this.ctx();
     c.resume();
-    this.heldDrone = startDrone(c, [this.tonicMidi - 12, this.tonicMidi], this.out(), 0.1);
+    const t = this.tonicMidi;
+    this.heldDrone = startDrone(c, [t - 12, t, t + 12], this.out(), 0.09);
   }
 
   stopHeldDrone() {
