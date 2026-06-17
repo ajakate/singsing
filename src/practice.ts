@@ -9,7 +9,14 @@ import {
   hzToMidiFloat,
   semitoneOffset,
 } from "./theory";
-import { PitchEngine, scheduleClick, scheduleDrone, scheduleTone } from "./audio";
+import {
+  type DroneHandle,
+  PitchEngine,
+  schedulePiano,
+  scheduleClick,
+  scheduleDrone,
+  startDrone,
+} from "./audio";
 import type { Settings } from "./settings";
 
 const MODE = "major" as const;
@@ -18,7 +25,6 @@ const COUNT_IN = 4; // beats before the first note
 const NOTE_BEATS = 1; // quarter notes
 const SEMI_RANGE = 12; // vertical span of the roll, in semitones above tonic
 const HZ_WINDOW = 5; // median smoothing window for the pitch guide
-const CHORD_DUR = 0.55; // seconds per cadence chord
 
 export type Verdict = "pending" | "hit" | "wrong" | "missed";
 
@@ -49,20 +55,30 @@ const COLORS: Record<Verdict, string> = {
   missed: "#555b66",
 };
 
-// I–IV–V–I voiced as semitone offsets above the tonic.
+// I–IV–V–I voiced as semitone offsets above the tonic, each with its root
+// doubled an octave below (the leading negative offset) for a fuller bottom.
 const CADENCE: number[][] = [
-  [0, 4, 7, 12], // I
-  [5, 9, 12], // IV
-  [7, 11, 14], // V
-  [0, 4, 7, 12], // I
+  [-12, 0, 4, 7, 12], // I
+  [-7, 5, 9, 12], // IV
+  [-5, 7, 11, 14], // V
+  [-12, 0, 4, 7, 12], // I
 ];
+
+// One AudioContext for the whole page. Creating a new one per controller (e.g.
+// on every dev hot-reload remount) churns through the browser's context limit
+// and makes freshly-scheduled audio — like the count-in clicks — get dropped.
+let sharedCtx: AudioContext | undefined;
+function sharedAudioContext(): AudioContext {
+  if (!sharedCtx) sharedCtx = new AudioContext();
+  return sharedCtx;
+}
 
 export class PracticeController {
   private ctx2d: CanvasRenderingContext2D;
   private engine = new PitchEngine();
-  private audioCtx?: AudioContext;
 
   private master?: GainNode; // all scheduled audio routes through this so stop() can cut it
+  private heldDrone?: DroneHandle; // press-and-hold reference drone
   private key: Key = { tonicPc: 0, mode: MODE };
   private tonicMidi = 60; // C4; recomputed per key, kept in a singable octave
   private melody: DegreeNote[] = [];
@@ -94,9 +110,24 @@ export class PracticeController {
 
   dispose() {
     window.removeEventListener("resize", this.onResize);
+    this.stopHeldDrone();
     this.stopAllAudio();
     this.engine.stop();
-    this.audioCtx?.close();
+    // intentionally do NOT close the shared AudioContext — it's reused across
+    // controller remounts for the lifetime of the page.
+  }
+
+  // Press-and-hold reference drone: tonic (+ octave below) until released.
+  startHeldDrone() {
+    if (this.running || this.heldDrone) return;
+    const c = this.ctx();
+    c.resume();
+    this.heldDrone = startDrone(c, [this.tonicMidi - 12, this.tonicMidi], this.out(), 0.1);
+  }
+
+  stopHeldDrone() {
+    this.heldDrone?.stop();
+    this.heldDrone = undefined;
   }
 
   // Output node for all scheduled audio; cutting it stops everything at once.
@@ -128,8 +159,7 @@ export class PracticeController {
   private get beatDur() { return 60 / this.getSettings().bpm; }
 
   private ctx(): AudioContext {
-    if (!this.audioCtx) this.audioCtx = new AudioContext();
-    return this.audioCtx;
+    return sharedAudioContext();
   }
 
   private curBeat() {
@@ -166,6 +196,7 @@ export class PracticeController {
   }
 
   async start() {
+    this.stopHeldDrone(); // in case it was held when the run began
     const c = this.ctx();
     await c.resume();
     if (!this.engine.isLive) await this.engine.start(c, (s) => this.onSample(s.hz));
@@ -173,17 +204,9 @@ export class PracticeController {
     this.resetRun();
     this.cb.onResult(null);
 
-    const { playCadence, playDrone } = this.getSettings();
+    const { playDrone } = this.getSettings();
     const outNode = this.out();
-    const lead = c.currentTime + 0.15;
-
-    // Optional cadence first; the count-in starts after it.
-    let preroll = 0;
-    if (playCadence) {
-      CADENCE.forEach((chord, i) => this.scheduleChord(c, chord, lead + i * CHORD_DUR, CHORD_DUR * 0.95));
-      preroll = CADENCE.length * CHORD_DUR + 0.2;
-    }
-    this.startTime = lead + preroll;
+    this.startTime = c.currentTime + 0.25; // lead so the first count-in click isn't clipped
 
     const totalBeats = COUNT_IN + this.melody.length * NOTE_BEATS;
     for (let b = 0; b < totalBeats; b++) {
@@ -203,19 +226,32 @@ export class PracticeController {
     this.finishRun();
   }
 
+  // Play a I–IV–V–I cadence in the current key, on demand, so the singer can
+  // hear the tonic before an exercise.
+  playCadence() {
+    const c = this.ctx();
+    c.resume();
+    const t0 = c.currentTime + 0.08;
+    const step = this.beatDur; // one chord per beat, following the tempo setting
+    CADENCE.forEach((chord, i) => {
+      const last = i === CADENCE.length - 1;
+      this.scheduleChord(c, chord, t0 + i * step, step * (last ? 1.9 : 1.3));
+    });
+  }
+
   preview() {
     const c = this.ctx();
     c.resume();
     const out = this.out();
     const t0 = c.currentTime + 0.1;
-    scheduleTone(c, this.tonicMidi, t0, 0.4, out);
     this.melody.forEach((n, i) => {
-      scheduleTone(c, this.tonicMidi + semitoneOffset(n, MODE), t0 + 0.5 + i * this.beatDur, this.beatDur * 0.9, out);
+      const dur = Math.min(this.beatDur * 0.95, 0.8);
+      schedulePiano(c, this.tonicMidi + semitoneOffset(n, MODE), t0 + i * this.beatDur, dur, out, 0.22);
     });
   }
 
   private scheduleChord(c: AudioContext, semis: number[], at: number, dur: number) {
-    for (const s of semis) scheduleTone(c, this.tonicMidi + s, at, dur, this.out());
+    for (const s of semis) schedulePiano(c, this.tonicMidi + s, at, dur, this.out(), 0.11);
   }
 
   // --- per-frame scoring ---

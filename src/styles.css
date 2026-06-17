@@ -37,6 +37,8 @@ button {
 }
 button.secondary { background: #2a2e37; }
 button:disabled { opacity: 0.5; cursor: default; }
+/* press-and-hold drone button: no text selection / long-press callout on mobile */
+button.hold { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
 
 .score { font-size: 1.05rem; margin-top: 0.5rem; min-height: 1.4rem; }
 .tag { font-variant-numeric: tabular-nums; }

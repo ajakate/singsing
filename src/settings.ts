@@ -8,7 +8,6 @@ export interface Settings {
   degreePool: number[]; // which scale degrees (1..7) melodies may use
   melodyLength: number; // notes per exercise
   keyPool: number[]; // tonic pitch classes (0..11) to pick from each exercise
-  playCadence: boolean; // play a I–IV–V–I before counting in
   playDrone: boolean; // sustain a tonic drone through the exercise
 }
 
@@ -19,7 +18,6 @@ export const DEFAULT_SETTINGS: Settings = {
   degreePool: [1, 2, 3, 4, 5],
   melodyLength: 4,
   keyPool: [0], // C only by default
-  playCadence: true,
   playDrone: false,
 };
 

@@ -109,21 +109,16 @@ export function SettingsScreen({ settings, onChange }: Props) {
       </div>
 
       <div className="field">
-        <label>Key reference</label>
+        <label>Drone</label>
         <div className="degree-toggles">
-          <button
-            className={`toggle wide${settings.playCadence ? " on" : ""}`}
-            onClick={() => set("playCadence", !settings.playCadence)}
-          >
-            Cadence (I–IV–V–I)
-          </button>
           <button
             className={`toggle wide${settings.playDrone ? " on" : ""}`}
             onClick={() => set("playDrone", !settings.playDrone)}
           >
-            Tonic drone (headphones needed)
+            Tonic drone through exercise (headphones needed)
           </button>
         </div>
+        <p className="muted small">Use the 🎹 Cadence button on the main screen to hear the key.</p>
       </div>
 
       <button className="secondary" onClick={() => onChange({ ...DEFAULT_SETTINGS })}>

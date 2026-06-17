@@ -119,6 +119,99 @@ export function scheduleDrone(
   }
 }
 
+/**
+ * Schedule a piano-ish note: a few decaying harmonics through a lowpass that
+ * closes over the note, with a struck envelope (fast attack, exponential decay
+ * to a low sustain, release). Warmer and less buzzy than scheduleTone, and
+ * rings longer so chords don't sound staccato. No samples / dependencies.
+ */
+export function schedulePiano(
+  ctx: AudioContext,
+  midi: number,
+  at: number,
+  dur: number,
+  out: AudioNode = ctx.destination,
+  level = 0.25,
+): void {
+  const freq = midiToHz(midi);
+  const env = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 0.7;
+  filter.frequency.setValueAtTime(Math.min(freq * 7, 9000), at);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(freq * 2.5, 900), at + dur);
+  filter.connect(env).connect(out);
+
+  // fundamental + a few quieter harmonics gives a warmer, bell-to-mellow tone
+  const partials: [number, number][] = [
+    [1, 1],
+    [2, 0.45],
+    [3, 0.18],
+    [4, 0.08],
+  ];
+  const oscs: OscillatorNode[] = [];
+  for (const [mult, g] of partials) {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = freq * mult;
+    const gain = ctx.createGain();
+    gain.gain.value = g;
+    osc.connect(gain).connect(filter);
+    oscs.push(osc);
+  }
+
+  const attack = 0.006;
+  const sustain = Math.max(level * 0.2, 0.0001);
+  env.gain.setValueAtTime(0.0001, at);
+  env.gain.exponentialRampToValueAtTime(level, at + attack);
+  env.gain.exponentialRampToValueAtTime(sustain, at + Math.min(dur * 0.6, 0.8));
+  env.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+
+  for (const osc of oscs) {
+    osc.start(at);
+    osc.stop(at + dur + 0.05);
+  }
+}
+
+export interface DroneHandle {
+  stop: () => void;
+}
+
+/**
+ * Start an open-ended drone that plays until the returned handle's stop() is
+ * called (for a press-and-hold button). Fades in/out to avoid clicks.
+ */
+export function startDrone(
+  ctx: AudioContext,
+  midis: number[],
+  out: AudioNode = ctx.destination,
+  level = 0.1,
+): DroneHandle {
+  const now = ctx.currentTime;
+  const voices = midis.map((midi) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = midiToHz(midi);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(level, now + 0.08);
+    osc.connect(gain).connect(out);
+    osc.start(now);
+    return { osc, gain };
+  });
+  return {
+    stop() {
+      const t = ctx.currentTime;
+      for (const { osc, gain } of voices) {
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.0001), t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        osc.stop(t + 0.13);
+      }
+    },
+  };
+}
+
 /** Schedule a pitched tone (reference / melody preview) at time `at`. */
 export function scheduleTone(
   ctx: AudioContext,

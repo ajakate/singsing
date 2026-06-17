@@ -61,9 +61,28 @@ export function PracticeScreen({ settings }: { settings: Settings }) {
         <button
           className="secondary"
           disabled={running}
+          onClick={() => ctrlRef.current?.playCadence()}
+        >
+          🎹 Cadence
+        </button>
+        <button
+          className="secondary"
+          disabled={running}
           onClick={() => ctrlRef.current?.preview()}
         >
           🔊 Preview
+        </button>
+        <button
+          className="secondary hold"
+          disabled={running}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            ctrlRef.current?.startHeldDrone();
+          }}
+          onPointerUp={() => ctrlRef.current?.stopHeldDrone()}
+          onPointerCancel={() => ctrlRef.current?.stopHeldDrone()}
+        >
+          🎵 Hold for tonic drone
         </button>
         <button
           onClick={() => (running ? ctrlRef.current?.stop() : ctrlRef.current?.start())}
