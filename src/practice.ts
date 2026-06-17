@@ -125,7 +125,9 @@ export class PracticeController {
     const c = this.ctx();
     c.resume();
     const t = this.tonicMidi;
-    this.heldDrone = startDrone(c, [t - 12, t, t + 12], this.out(), 0.09);
+    // triangle (richer than sine) at a higher level so it's as present as the
+    // cadence, especially on phone speakers
+    this.heldDrone = startDrone(c, [t - 12, t, t + 12], this.out(), 0.18, "triangle");
   }
 
   stopHeldDrone() {

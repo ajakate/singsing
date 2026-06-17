@@ -186,12 +186,13 @@ export function startDrone(
   midis: number[],
   out: AudioNode = ctx.destination,
   level = 0.1,
+  type: OscillatorType = "sine",
 ): DroneHandle {
   const now = ctx.currentTime;
   const voices = midis.map((midi) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = type;
     osc.frequency.value = midiToHz(midi);
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(level, now + 0.08);
