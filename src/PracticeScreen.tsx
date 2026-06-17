@@ -85,6 +85,7 @@ export function PracticeScreen({ settings }: { settings: Settings }) {
           🎵 Hold for tonic drone
         </button>
         <button
+          className="primary"
           onClick={() => (running ? ctrlRef.current?.stop() : ctrlRef.current?.start())}
         >
           {running ? "⏹ Stop" : "🎤 Start & sing"}

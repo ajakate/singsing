@@ -59,6 +59,26 @@ button.hold { user-select: none; -webkit-user-select: none; -webkit-touch-callou
   background: #1e2127; color: #6b7280; border: 2px solid #2a2e37; font-size: 1rem;
 }
 .toggle.on { background: #2d4a8a; border-color: #5b8def; color: #fff; }
-.toggle.wide { width: auto; height: auto; padding: 0.5rem 0.9rem; font-size: 0.9rem; }
+.toggle.wide { width: auto; height: auto; max-width: 100%; padding: 0.5rem 0.9rem; font-size: 0.9rem; }
 .row { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 .row button { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+
+/* --- mobile --- */
+@media (max-width: 560px) {
+  body { padding: 1rem; }
+  h1 { font-size: 1.05rem; }
+
+  /* control buttons: two-up grid with big touch targets; Start spans the row */
+  .controls { gap: 0.5rem; }
+  .controls button { flex: 1 1 45%; min-height: 48px; }
+  .controls button.primary { flex-basis: 100%; }
+
+  canvas { height: 240px; }
+  .field { padding: 0.85rem; }
+}
+
+@media (max-width: 400px) {
+  h1 .muted { display: none; } /* keep just "singsing" in the header */
+  .countin { gap: 0.45rem; }
+  .countin .dot { width: 2rem; height: 2rem; }
+}
